@@ -1,67 +1,140 @@
-#include <Arduino.h>
-// กำหนดขา LED แต่ละดวง
-const int led1 = 23;
-const int led2 = 19;
-const int led3 = 18;
-const int led4 = 5;
-const int led5 = 17;
-const int led6 = 16;
-const int led7 = 4;
-const int led8 = 0;
+// Library version:1.1.5
+// Example of picking custom I2C pins on ESP32
 
-// กำหนดขา potentiometer
-const int potPin = 36;  // ขา A36 ที่เชื่อมต่อกับ potentiometer
+#include <Arduino.h>
+#include <LiquidCrystal_I2C.h>
+
+#define I2C_SDA 21
+#define I2C_SCL 22
+
+LiquidCrystal_I2C lcd(0x27, 20, 4); // ตั้งค่าที่อยู่ของ LCD
+
+// กำหนดขาเชื่อมต่อ
+int leds[8] = {23, 22, 21, 19, 18, 17, 16, 4};  // LED 8 หลอด
+int sw_next = 15; // ปุ่ม Next
+int sw_ok = 2;    // ปุ่ม OK
+
+int menu = 0;
 
 void setup() {
-  // ตั้งค่าขา LED เป็น output
-  pinMode(led1, OUTPUT);
-  pinMode(led2, OUTPUT);
-  pinMode(led3, OUTPUT);
-  pinMode(led4, OUTPUT);
-  pinMode(led5, OUTPUT);
-  pinMode(led6, OUTPUT);
-  pinMode(led7, OUTPUT);
-  pinMode(led8, OUTPUT);
-  
-  // ตั้งค่าขา potentiometer เป็น input
-  pinMode(potPin, INPUT);
+  lcd.init(I2C_SDA, I2C_SCL); // กำหนดขา SDA และ SCL
+  lcd.backlight();  // เปิดไฟแบ็คไลท์ของ LCD
+
+  // กำหนดขา LED เป็น OUTPUT
+  for (int i = 0; i < 8; i++) {
+    pinMode(leds[i], OUTPUT);
+    digitalWrite(leds[i], LOW);  // เริ่มต้นด้วยการปิด LED
+  }
+
+  pinMode(sw_next, INPUT_PULLUP); // กำหนดปุ่ม Next เป็น INPUT_PULLUP
+  pinMode(sw_ok, INPUT_PULLUP);   // กำหนดปุ่ม OK เป็น INPUT_PULLUP
 }
 
 void loop() {
-  // อ่านค่าจาก potentiometer (0-4095)
-  int potValue = analogRead(potPin);
-  
-  // แปลงค่าจาก 0-4095 เป็น 0-100
-  int mappedValue = map(potValue, 0, 4095, 0, 100);
-  
-  // คำนวณจำนวน LED ที่จะเปิด (จาก 0-100)
-  int numLEDsToTurnOn = map(mappedValue, 0, 100, 0, 8);
-  
-  // เปิดหรือปิด LED ตามจำนวนที่คำนวณ
-  if (numLEDsToTurnOn >= 1) digitalWrite(led1, HIGH);
-  else digitalWrite(led1, LOW);
-  
-  if (numLEDsToTurnOn >= 2) digitalWrite(led2, HIGH);
-  else digitalWrite(led2, LOW);
-  
-  if (numLEDsToTurnOn >= 3) digitalWrite(led3, HIGH);
-  else digitalWrite(led3, LOW);
-  
-  if (numLEDsToTurnOn >= 4) digitalWrite(led4, HIGH);
-  else digitalWrite(led4, LOW);
-  
-  if (numLEDsToTurnOn >= 5) digitalWrite(led5, HIGH);
-  else digitalWrite(led5, LOW);
-  
-  if (numLEDsToTurnOn >= 6) digitalWrite(led6, HIGH);
-  else digitalWrite(led6, LOW);
-  
-  if (numLEDsToTurnOn >= 7) digitalWrite(led7, HIGH);
-  else digitalWrite(led7, LOW);
-  
-  if (numLEDsToTurnOn >= 8) digitalWrite(led8, HIGH);
-  else digitalWrite(led8, LOW);
-  
-  delay(100);  // หน่วงเวลาเล็กน้อย
-}
+  int status_next = digitalRead(sw_next); // อ่านสถานะปุ่ม Next
 
+  if (status_next == LOW) {  // ถ้ากดปุ่ม Next
+    menu++;
+    if (menu > 5) {  // เมื่อถึงเมนูสุดท้ายให้กลับไปที่เมนูแรก
+      menu = 0;
+    }
+    delay(200);  // หน่วงเวลา
+  }
+
+  // แสดงเมนูที่เลือกบน LCD
+  lcd.clear();  // ล้างหน้าจอก่อน
+  lcd.setCursor(0, 0);
+  lcd.print("Menu: ");
+  lcd.print(menu + 1);  // แสดงหมายเลขเมนูที่เลือก
+
+  switch (menu) {
+    case 0:
+      // เมนู 1: LED ทั้ง 8 หลอดเปิดพร้อมกัน
+      lcd.setCursor(0, 1);
+      lcd.print("LED All ON");
+      for (int i = 0; i < 8; i++) {
+        digitalWrite(leds[i], HIGH);  // เปิด LED ทั้ง 8 หลอด
+      }
+      break;
+
+    case 1:
+      // เมนู 2: LED กระพริบสลับกัน (คู่-คี่)
+      lcd.setCursor(0, 1);
+      lcd.print("LED Blink Odd/Even");
+      for (int i = 0; i < 8; i++) {
+        if (i % 2 == 0) {
+          digitalWrite(leds[i], HIGH);  // เปิด LED คู่
+        } else {
+          digitalWrite(leds[i], LOW);   // ปิด LED คี่
+        }
+      }
+      delay(500);
+      for (int i = 0; i < 8; i++) {
+        if (i % 2 == 0) {
+          digitalWrite(leds[i], LOW);   // ปิด LED คู่
+        } else {
+          digitalWrite(leds[i], HIGH);  // เปิด LED คี่
+        }
+      }
+      delay(500);
+      break;
+
+    case 2:
+      // เมนู 3: LED สว่างทีละหลอดวนไปเรื่อย ๆ
+      lcd.setCursor(0, 1);
+      lcd.print("LED Chase");
+      for (int i = 0; i < 8; i++) {
+        digitalWrite(leds[i], HIGH);  // เปิด LED ทีละหลอด
+        delay(200);
+        digitalWrite(leds[i], LOW);   // ปิด LED
+      }
+      break;
+
+    case 3:
+      // เมนู 4: LED ติดเป็นคู่ (2 หลอดในเวลาเดียวกัน)
+      lcd.setCursor(0, 1);
+      lcd.print("LED Pair ON");
+      for (int i = 0; i < 8; i += 2) {
+        digitalWrite(leds[i], HIGH);   // เปิด LED คู่
+        digitalWrite(leds[i + 1], HIGH);
+      }
+      break;
+
+    case 4:
+      // เมนู 5: LED สว่างเรียงลําดับจากหลอดแรกถึงหลอดสุดท้ายและดับกลับทีละหลอด
+      lcd.setCursor(0, 1);
+      lcd.print("LED Sequence ON/OFF");
+      for (int i = 0; i < 8; i++) {
+        digitalWrite(leds[i], HIGH);  // เปิด LED ตามลำดับ
+        delay(200);
+      }
+      for (int i = 7; i >= 0; i--) {
+        digitalWrite(leds[i], LOW);   // ปิด LED ตามลำดับ
+        delay(200);
+      }
+      break;
+
+    case 5:
+      // เมนู 6: LED กระพริบทั้งหมดพร้อมกัน
+      lcd.setCursor(0, 1);
+      lcd.print("LED All Blink");
+      for (int i = 0; i < 8; i++) {
+        digitalWrite(leds[i], HIGH);  // เปิด LED ทั้งหมด
+      }
+      delay(500);
+      for (int i = 0; i < 8; i++) {
+        digitalWrite(leds[i], LOW);   // ปิด LED ทั้งหมด
+      }
+      delay(500);
+      break;
+  }
+
+  // ตรวจสอบการกดปุ่ม OK เพื่อยืนยันการเลือกเมนู
+  int status_ok = digitalRead(sw_ok);
+  if (status_ok == LOW) {
+    // เมื่อกดปุ่ม OK สามารถทำอะไรเพิ่มเติมได้ (ในกรณีนี้ไม่ทำอะไร)
+    delay(200);  // หน่วงเวลา
+  }
+
+  delay(200);  // หน่วงเวลา
+}
